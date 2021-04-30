@@ -1,18 +1,54 @@
 const { google } = require('googleapis');
+const Emitter = require("events");
+const Poll = require("./Poll");
+const Command = require("./Command");
+
+const NEW_MESSAGE_EVENT = 'NewMessage';
 
 // Put the following at the top of the file
 // right below the'googleapis' import
 const util = require('util');
 const fs = require('fs');
+let emitter = new Emitter();
 
 let liveChatId; // Where we'll store the id of our liveChat
+let adminId;
 let nextPage; // How we'll keep track of pagination for chat messages
 const intervalTime = 5000; // Miliseconds between requests to check chat messages
 let interval; // variable to store and control the interval that will check messages
 let chatMessages = []; // where we'll store all messages
+let badWords = ['хуй', 'пизда', 'снюс', 'гашиш', 'бедтрип']
+let poll = new Poll();
+let isPolling = false;
+let commands = {
+  '@poll-start': startListeningPoll,
+  '@poll-stop': stopListeningPoll,
+  '@*': addVariant,
+};
 
 const writeFilePromise = util.promisify(fs.writeFile);
 const readFilePromise = util.promisify(fs.readFile);
+
+function startListeningPoll() {
+  if(!isPolling) {
+    isPolling = true;
+    //youtubeService.insertMessage('Poll is start!');
+  }
+}
+function stopListeningPoll() {
+  if(isPolling) {
+    let report = poll.report();
+    poll.clear();
+    isPolling = false;
+    //youtubeService.insertMessage('Poll is stop!');
+    youtubeService.insertMessage(report);
+  }
+}
+function addVariant(variant) {
+  if(isPolling) {
+    poll.add(variant);
+  }
+}
 
 const save = async (path, str) => {
   fs.writeFileSync(path, str, function (err) {
@@ -71,12 +107,14 @@ youtubeService.findActiveChat = async () => {
   const response = await youtube.liveBroadcasts.list({
     auth,
     part: 'snippet,status',
-    mine: 'true'
+    mine: 'true',
+    maxResults: 50
   });
   const chats = response.data.items;
   chats.forEach((chat) => {
       if(chat.status.lifeCycleStatus === 'live') {
         liveChatId = chat.snippet.liveChatId;
+        adminId = chat.snippet.channelId;
         console.log("Chat ID Found:", liveChatId);
         return 1;
       }
@@ -124,23 +162,68 @@ const respond = newMessages => {
   });
 };
 
+const messagesFilter = (messages) => {
+  var goodMessages = [];
+  messages.forEach((message) => {
+        let messageText = message.snippet.textMessageDetails.messageText;
+        let messageId = message.id;
+        let isGood = false;
+        badWords.forEach((badWord) => {
+          if(messageText.includes(badWord))
+            youtubeService.deleteMessage(messageId);
+          else
+            isGood = true;
+        });
+        if(isGood)
+          goodMessages.push(message);
+      }
+  );
+  return goodMessages;
+};
+
 const getChatMessages = async () => {
   const response = await youtube.liveChatMessages.list({
     auth,
-    part: 'snippet,authorDetails',
+    part: 'id,snippet,authorDetails',
     liveChatId,
     pageToken: nextPage
   });
   const { data } = response;
-  const newMessages = data.items;
+  let newMessages = data.items;
+  newMessages = messagesFilter(newMessages);
   chatMessages.push(...newMessages);
   nextPage = data.nextPageToken;
+  newMessages.forEach((newMessage) => {
+    emitter.emit(NEW_MESSAGE_EVENT, newMessage);
+  });
   console.log('Total Chat Messages:', chatMessages.length);
   respond(newMessages);
 };
 
+const onNewMessage = (message) => {
+  let command = detectCommand(message);
+  if(!command)
+    return ;
+  command.exec();
+}
+
+const detectCommand = (message) => {
+  let authorId = message.authorDetails.channelId;
+  let messageText = message.snippet.textMessageDetails.messageText;
+  let command = new Command(commands);
+  command.load(messageText);
+  if(adminId == authorId && command.validate())
+  {
+    return command;
+  }
+  return false;
+}
+
+
+
 youtubeService.startTrackingChat = () => {
   interval = setInterval(getChatMessages, intervalTime);
+  emitter.on(NEW_MESSAGE_EVENT, onNewMessage);
   return interval;
 };
 
@@ -164,6 +247,16 @@ youtubeService.insertMessage = messageText => {
       }
     },
     () => {}
+  );
+};
+
+youtubeService.deleteMessage = messageId => {
+  youtube.liveChatMessages.delete(
+      {
+        auth,
+        id: messageId,
+      },
+      () => {}
   );
 };
 

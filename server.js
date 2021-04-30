@@ -47,6 +47,16 @@ server.get('/insert-message', (req, res) => {
   res.redirect('/');
 });
 
+server.get('/delete-message', (req, res) => {
+  youtubeService.deleteMessage('LCC.CikqJwoYVUNIb1VNV1dMdWRnQWV6UzNZLXRlSXB3EgthQjZ2VFA3aXBvTRI5ChpDTmVEbUl5b3B2QUNGWWlLd1FvZDJCRUkyQRIbQ09TZWhvYWlwdkFDRlpBUDRBb2R3NzhBaXcw');
+  res.redirect('/');
+});
+
+server.get('/list-message', (req, res) => {
+  youtubeService.listMessage();
+  res.redirect('/');
+});
+
 server.listen(3000, function() {
   console.log('Server is Ready');
 });
