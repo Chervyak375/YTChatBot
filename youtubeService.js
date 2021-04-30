@@ -5,7 +5,7 @@ const { google } = require('googleapis');
 const util = require('util');
 const fs = require('fs');
 
-let liveChatId = 'KicKGFVDSG9VTVdXTHVkZ0FlelMzWS10ZUlwdxILZmhpaTdETjdCdGc'; // Where we'll store the id of our liveChat
+let liveChatId; // Where we'll store the id of our liveChat
 let nextPage; // How we'll keep track of pagination for chat messages
 const intervalTime = 5000; // Miliseconds between requests to check chat messages
 let interval; // variable to store and control the interval that will check messages
@@ -70,18 +70,26 @@ youtubeService.authorize = ({ tokens }) => {
 youtubeService.findActiveChat = async () => {
   const response = await youtube.liveBroadcasts.list({
     auth,
-    part: 'snippet',
+    part: 'snippet,status',
     mine: 'true'
   });
-  const latestChat = response.data.items[0];
-  console.log(response.data.items);
-
-  if (latestChat && latestChat.snippet.liveChatId) {
-    liveChatId = latestChat.snippet.liveChatId;
-    console.log("Chat ID Found:", liveChatId);
-  } else {
+  const chats = response.data.items;
+  chats.forEach((chat) => {
+      if(chat.status.lifeCycleStatus === 'live') {
+        liveChatId = chat.snippet.liveChatId;
+        console.log("Chat ID Found:", liveChatId);
+        return 1;
+      }
+  });
+  if(liveChatId === undefined)
     console.log("No Active Chat Found");
-  }
+  // const latestChat = chats[0];
+  // if (latestChat && latestChat.snippet.liveChatId) {
+  //   liveChatId = latestChat.snippet.liveChatId;
+  //   console.log("Chat ID Found:", liveChatId);
+  // } else {
+  //   console.log("No Active Chat Found");
+  // }
 };
 
 // Update the tokens automatically when they expire
@@ -133,6 +141,7 @@ const getChatMessages = async () => {
 
 youtubeService.startTrackingChat = () => {
   interval = setInterval(getChatMessages, intervalTime);
+  return interval;
 };
 
 youtubeService.stopTrackingChat = () => {

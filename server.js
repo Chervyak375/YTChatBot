@@ -1,9 +1,14 @@
 const express = require('express');
 const path = require('path');
+// const Bot = require('./Bot');
 
 const youtubeService = require('./youtubeService.js');
 
+// let bot = new Bot(youtubeService);
+
 const server = express();
+
+let streams = [];
 
 server.get('/', (req, res) =>
   res.sendFile(path.join(__dirname + '/index.html'))
@@ -26,7 +31,9 @@ server.get('/find-active-chat', (req, res) => {
 });
 
 server.get('/start-tracking-chat', (req, res) => {
-  youtubeService.startTrackingChat();
+  let stream = youtubeService.startTrackingChat();
+  streams.push(stream);
+  console.log(stream);
   res.redirect('/');
 });
 

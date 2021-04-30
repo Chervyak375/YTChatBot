@@ -1,11 +1,24 @@
+const Emitter = require("events");
+
 class Bot {
-    //let EventNewMessage;
+    NewMessageEvent = new Emitter();
+    constructor(youtubeService) {
+        this.youtubeService = youtubeService;
+    }
 
     SendMessage(messageText){}
     ReplyMessage(messageId, messageText){}
     DeleteMessage(messageId){}
-    AddHandlerOnEvent(event, handler){}
-    HandlerMat(){}
+    AddHandlerOnEvent(event, handler)
+    {
+        this.NewMessageEvent.on()
+    }
+    HandlreMat(newMessage){
+        if(newMessage == 'хуй')
+        {
+            this.DeleteMessage(newMessage.messageId);
+        }
+    }
     ListeningPoll(){
         let startWorl = '/start poll';
         let stopWorl = '/stop poll';
@@ -21,6 +34,8 @@ class Bot {
         }
     }
 }
+
+module.exports = Bot;
 
 /*
 
